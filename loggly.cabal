@@ -1,0 +1,29 @@
+cabal-version:       >=1.10
+name:                loggly
+version:             0.1.0.0
+synopsis:            Send JSON data to loggly.
+description:         Support for a single-endpoint, single message, portion of
+                     loggly's API
+license:             BSD3
+license-file:        LICENSE
+author:              Thomas M. DuBuisson
+maintainer:          tommd@muse.dev
+copyright:           2019
+category:            Web
+build-type:          Simple
+extra-source-files:  CHANGELOG.md
+
+library
+  exposed-modules:    Loggly
+  build-depends:       base >=4.9 && <5,
+                       aeson,
+                       http-client-tls,
+                       servant >=0.16,
+                       servant-client >= 0.16,
+                       text
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: http://github.com/TomMD/loggly.git
