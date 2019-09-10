@@ -8,6 +8,7 @@ module Loggly
     ( Token, makeToken
     , Tag, makeTag
     , newLoggly, Loggly
+    , loggly
     ) where
 
 import           Control.Monad.IO.Class
