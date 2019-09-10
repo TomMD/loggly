@@ -12,6 +12,8 @@ module Loggly
     ) where
 
 import           Control.Monad.IO.Class
+import           Control.Concurrent (forkIO)
+import           Control.Monad (forever,void)
 import qualified Data.Aeson as Aeson
 import           Data.Char (isAlphaNum)
 import           Data.Coerce
@@ -22,6 +24,8 @@ import           Data.Text (Text)
 import qualified Network.HTTP.Client.TLS as HTTP
 import           Servant.API
 import           Servant.Client
+import           Control.Concurrent.STM (atomically)
+import           Control.Concurrent.STM.TBChan
 
 -- | A loggly authentication token (secret).
 newtype Token = Token Text
@@ -76,12 +80,10 @@ base = either err id $ parseBaseUrl logglyLoggingURL
 newLoggly :: MonadIO m => Token -> m Loggly
 newLoggly token =
     do mgr <- HTTP.newTlsManager
+       chan <- liftIO $ atomically (newTBChan 1024)
        let env = mkClientEnv mgr base
-       let logglyIO payload tags =
-                either Left (const (Right ())) <$>  
-              runClientM (logglyCM payload token (makeTags tags)) env >>= \case
-                Left (UnsupportedContentType _ _) -> pure $ Right ()
-                e -> pure e
+       let logglyIO payload tags = atomically $ writeTBChan chan (payload, tags)
+       void $ liftIO $ forkIO (run chan env)
        pure (Loggly logglyIO)
   where
     logglyCM = client logglyAPIProxy
@@ -89,13 +91,23 @@ newLoggly token =
     makeTags :: [Tag] -> Tags
     makeTags = Tags . T.intercalate "," . coerce
 
+    run :: TBChan (Aeson.Value,[Tag]) -> ClientEnv -> IO ()
+    run ch env =
+        forever (atomically (readTBChan ch) >>= uncurry (send env))
+
+    send env payload tags =
+      do either Left (const (Right ())) <$>
+            runClientM (logglyCM payload token (makeTags tags)) env >>= \case
+                Left (UnsupportedContentType _ _) -> pure $ Right ()
+                e -> pure e
+
 
 -- | A structure allowing sending log messages to Loggly.  This value closes
 -- over the HTTP manager and loggly token provided to 'newLoggly'.
-newtype Loggly = Loggly { logToLoggly :: Aeson.Value -> [Tag] -> IO (Either ClientError ()) }
+newtype Loggly = Loggly { logToLoggly :: Aeson.Value -> [Tag] -> IO () }
 
 -- | Log a message to loggly with particular tags.
-loggly :: (MonadIO m, Aeson.ToJSON a) => Loggly -> a -> [Tag] -> m (Either ClientError ())
+loggly :: (MonadIO m, Aeson.ToJSON a) => Loggly -> a -> [Tag] -> m ()
 loggly (Loggly f) a = liftIO . f (Aeson.toJSON a)
 
 logglyAPIProxy :: Proxy LogglyAPI
