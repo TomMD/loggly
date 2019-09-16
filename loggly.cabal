@@ -17,6 +17,7 @@ library
   exposed-modules:    Loggly
   build-depends:       base >=4.9 && <5,
                        aeson,
+                       bytestring,
                        http-client-tls,
                        servant >=0.16,
                        servant-client >= 0.16,
