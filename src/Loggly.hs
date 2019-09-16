@@ -86,7 +86,6 @@ newLoggly token =
        chan <- liftIO $ atomically (newTBChan 1024)
        let env = mkClientEnv mgr base
        let logglyIO payload tags = atomically $ writeTBChan chan (payload, tags)
-       void $ liftIO $ forkIO (run chan env)
        void $ liftIO $ forkIO (runBulk chan env)
        pure (Loggly logglyIO)
   where
@@ -94,16 +93,6 @@ newLoggly token =
 
     makeTags :: [Tag] -> Tags
     makeTags = Tags . T.intercalate "," . coerce
-
-    run :: TBChan (Aeson.Value,[Tag]) -> ClientEnv -> IO ()
-    run ch env =
-        forever (atomically (readTBChan ch) >>= uncurry (send env))
-
-    send env payload tags =
-         either Left (const (Right ())) <$>
-            runClientM (logglyCM payload token (makeTags tags)) env >>= \case
-                Left (UnsupportedContentType _ _) -> pure $ Right ()
-                e -> pure e
 
     -- | Try to send many messages at once, stopping at 64 or when a message
     -- with different tags is encountered.
