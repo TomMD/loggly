@@ -8,6 +8,7 @@ module Loggly
     ( Token, makeToken
     , Tag, makeTag
     , newLoggly, Loggly
+    , nullLoggly
     , loggly
     ) where
 
@@ -122,6 +123,9 @@ newLoggly token =
 -- | A structure allowing sending log messages to Loggly.  This value closes
 -- over the HTTP manager and loggly token provided to 'newLoggly'.
 newtype Loggly = Loggly { logToLoggly :: Aeson.Value -> [Tag] -> IO () }
+
+nullLoggly :: Loggly
+nullLoggly = Loggly (\_ _ -> pure ())
 
 -- | Log a message to loggly with particular tags.
 loggly :: (MonadIO m, Aeson.ToJSON a) => Loggly -> a -> [Tag] -> m ()
